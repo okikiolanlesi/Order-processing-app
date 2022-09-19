@@ -2,8 +2,8 @@ const fs = require('fs');
 // const path = require('path');
 const Order = require('../models/orderModel.js');
 const APIFeatures = require('../utils/APIFeatures.js');
-
-exports.getAllOrders = async (req, res) => {
+const catchAsync = require('./../utils/catchAsync');
+exports.getAllOrders = catchAsync(async (req, res, next) => {
   // authenticate(req, res, ['admin'])
   //   .then(() => res.status(200).send('Gotten an order'))
   //   .catch((err) => {
@@ -14,37 +14,28 @@ exports.getAllOrders = async (req, res) => {
   //       },
   //     });
   //   });
-  try {
-    const features = new APIFeatures(Order, req.query);
-    const orders = await features.filter().sort().limitFields().paginate();
 
-    res.status(200).json({
-      status: 'success',
-      results: orders.length,
-      data: { orders },
-    });
-  } catch (err) {
-    res.status(400).json({
-      status: 'fail',
-      message: err,
-    });
-  }
-};
+  const features = new APIFeatures(Order, req.query)
+    .filter()
+    .sort()
+    .limitFields()
+    .paginate();
+  const orders = await features.query;
 
-exports.getOrder = async (req, res) => {
-  try {
-    const order = await Order.findById(req.params.id);
-    res.status(200).json({
-      status: 'success',
-      data: { order },
-    });
-  } catch (err) {
-    res.status(400).json({
-      status: 'fail',
-      message: err,
-    });
-  }
-};
+  res.status(200).json({
+    status: 'success',
+    results: orders.length,
+    data: { orders },
+  });
+});
+
+exports.getOrder = catchAsync(async (req, res, next) => {
+  const order = await Order.findById(req.params.id);
+  res.status(200).json({
+    status: 'success',
+    data: { order },
+  });
+});
 
 // authenticate = (req, res, roles) => {
 //   return new Promise((resolve, reject) => {
@@ -69,49 +60,27 @@ exports.getOrder = async (req, res) => {
 //   });
 // };
 
-exports.updateOrder = async (req, res) => {
-  try {
-    const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-    res.status(200).json({
-      status: 'success',
-      data: { updatedOrder },
-    });
-  } catch (err) {
-    res.status(400).json({
-      status: 'fail',
-      message: err,
-    });
-  }
-};
-exports.createOrder = async (req, res) => {
-  try {
-    const createdOrder = await Order.create(req.body);
-    res.status(200).json({
-      status: 'success',
-      data: { createdOrder },
-    });
-  } catch (err) {
-    res.status(400).json({
-      status: 'fail',
-      message: err,
-    });
-  }
-};
-exports.deleteOrder = async (req, res) => {
-  try {
-    const deletedOrder = await Order.findByIdAndDelete(req.params.id);
-    res.status(200).json({
-      status: 'success',
-      data: { deletedOrder },
-    });
-  } catch (err) {
-    res.status(400).json({
-      status: 'fail',
-      message: err,
-    });
-  }
-};
+exports.updateOrder = catchAsync(async (req, res, next) => {
+  const updatedOrder = await Order.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
+  res.status(200).json({
+    status: 'success',
+    data: { updatedOrder },
+  });
+});
+exports.createOrder = catchAsync(async (req, res, next) => {
+  const createdOrder = await Order.create(req.body);
+  res.status(200).json({
+    status: 'success',
+    data: { createdOrder },
+  });
+});
+exports.deleteOrder = catchAsync(async (req, res, next) => {
+  const deletedOrder = await Order.findByIdAndDelete(req.params.id);
+  res.status(200).json({
+    status: 'success',
+    data: { deletedOrder },
+  });
+});
