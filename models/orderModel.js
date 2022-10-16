@@ -6,6 +6,12 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Order must have a phone number'],
   },
+  state: {
+    type: String,
+    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+    default: 'pending',
+    required: [true, 'Order must have a state'],
+  },
   orderType: { type: String, required: [true, 'Order must have a order type'] },
   address: { type: String, required: [true, 'Order must have an address'] },
   orderContent: [{ type: String, required: [true, 'Order must have content'] }],
