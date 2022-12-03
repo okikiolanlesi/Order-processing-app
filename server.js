@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 
 process.on('uncaughtException', (err) => {
   console.log(err.name, err.message);
+  console.log(err.stack);
   console.log('UNCAUGHT EXCEPTION, Shutting down ...');
   process.exit();
 });
@@ -31,8 +32,16 @@ const server = app.listen(process.env.PORT, 'localhost', () => {
 
 process.on('unhandledRejection', (err) => {
   console.log(err.name, err.message);
+  console.log(err.stack);
+
   console.log('UNHANDLED REJECTION, Shutting down...');
   server.close(() => {
     process.exit();
+  });
+});
+process.on('SIGTERM', () => {
+  console.log('SIGTERM recieved, shutting down gracefully');
+  server.close(() => {
+    console.log('Shut down successful');
   });
 });

@@ -1,26 +1,44 @@
 const fs = require('fs');
-// const path = require('path');
 const Order = require('../models/orderModel.js');
 const APIFeatures = require('../utils/APIFeatures.js');
 const catchAsync = require('./../utils/catchAsync');
-exports.getAllOrders = catchAsync(async (req, res, next) => {
-  // authenticate(req, res, ['admin'])
-  //   .then(() => res.status(200).send('Gotten an order'))
-  //   .catch((err) => {
-  //     res.status(401).json({
-  //       status: 'fail',
-  //       data: {
-  //         message: err,
-  //       },
-  //     });
-  //   });
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const storage = multer.memoryStorage();
+const multerFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image')) {
+    cb(null, true);
+  } else {
+    cb(new AppError('Not an image! Please upload only images.', 400), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: multerFilter,
+  limits: { fileSize: 1024 * 1024 },
+});
+
+exports.uploadImages = upload.array('images', 50);
+
+exports.getAllOrders = catchAsync(async (req, res, next) => {
   const features = new APIFeatures(Order, req.query)
     .filter()
     .sort()
     .limitFields()
     .paginate();
-  const orders = await features.query;
+  const orders = await features.query.populate({
+    path: 'user',
+    select: 'firstName lastName email',
+  });
 
   res.status(200).json({
     status: 'success',
@@ -30,7 +48,10 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
 });
 
 exports.getOrder = catchAsync(async (req, res, next) => {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findById(req.params.id).populate({
+    path: 'user',
+    select: '-passwordChangedAt -__v',
+  });
   if (!order) {
     return next(new AppError('No tour found With that ID', 404));
   }
@@ -39,29 +60,6 @@ exports.getOrder = catchAsync(async (req, res, next) => {
     data: { order },
   });
 });
-
-// authenticate = (req, res, roles) => {
-//   return new Promise((resolve, reject) => {
-//     if (!req.body || !req.body.password || !req.body.username) {
-//       reject('Username or password is invalid');
-//     }
-//     let user;
-//     users.forEach((item) => {
-//       item.username == req.body.username ? (user = item) : null;
-//     });
-//     if (!user) {
-//       reject('Username or password is invalid');
-//     }
-//     if (!roles.includes(user.role)) {
-//       reject('User does not have have access to this feature');
-//     }
-//     if (req.body.password === user.password && roles.includes(user.role)) {
-//       resolve('User found');
-//     } else {
-//       reject('Passwords do not match');
-//     }
-//   });
-// };
 
 exports.updateOrder = catchAsync(async (req, res, next) => {
   const updatedOrder = await Order.findByIdAndUpdate(req.params.id, req.body, {
@@ -76,13 +74,68 @@ exports.updateOrder = catchAsync(async (req, res, next) => {
     data: { updatedOrder },
   });
 });
+
+exports.uploadPhotoToCloudinary = catchAsync(async (req, res, next) => {
+  if (!req.files) return next();
+  const images = [];
+
+  const uploadStream = (file) =>
+    new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'orderImages',
+        },
+        (error, result) => {
+          if (error) {
+            reject(error);
+          }
+          if (result) {
+            images.push(result.secure_url);
+            resolve(result);
+          }
+        }
+      );
+      streamifier.createReadStream(file.buffer).pipe(stream);
+    });
+
+  await Promise.all(
+    await req.files.map(async (file) => await uploadStream(file))
+  );
+  req.body.images = images;
+  next();
+});
+
 exports.createOrder = catchAsync(async (req, res, next) => {
-  const createdOrder = await Order.create(req.body);
-  res.status(200).json({
+  const {
+    customerName,
+    orderType,
+    phoneNumber,
+    orderContent,
+    address,
+    paid,
+    extraContent,
+    images,
+  } = req.body;
+  const order = {};
+  if (customerName) order.customerName = customerName;
+  if (orderType) order.orderType = orderType;
+  if (phoneNumber) order.phoneNumber = phoneNumber;
+  if (orderContent) order.orderContent = orderContent;
+  if (address) order.address = address;
+  if (paid) order.paid = paid;
+  if (extraContent) order.extraContent = extraContent;
+  if (images) order.images = images;
+  order.user = req.user.id;
+  const createdOrder = await Order.create(order);
+  if (!createdOrder) {
+    return next(new AppError('Unable to create order, try again later', 404));
+  }
+  res.status(201).json({
     status: 'success',
     data: { createdOrder },
   });
 });
+
 exports.deleteOrder = catchAsync(async (req, res, next) => {
   const deletedOrder = await Order.findByIdAndDelete(req.params.id);
   if (!deletedOrder) {
@@ -92,4 +145,12 @@ exports.deleteOrder = catchAsync(async (req, res, next) => {
     status: 'success',
     data: { deletedOrder },
   });
+});
+
+exports.checkIfUserCreatedOrder = catchAsync(async (req, res, next) => {
+  if (req.user.id === req.order.user.id) {
+    next();
+  } else {
+    return next(new AppError('You do not have access to this order', 401));
+  }
 });

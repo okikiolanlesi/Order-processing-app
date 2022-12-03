@@ -5,19 +5,22 @@ const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const hpp = require('hpp');
+const cookieParser = require('cookie-parser');
+const compression = require('compression');
 
 const orderRouter = require('./routes/orderRoutes');
 const userRouter = require('./routes/userRoutes');
 const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./controllers/errorController');
 
+const app = express();
 //MIDDLEWARES
-if (process.env.NODE_ENV === development) {
+if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 // Sets security HTTP headers
 app.use(helmet());
-
+app.use(cookieParser());
 // Limits request per IP address
 const limiter = rateLimit({
   max: 100,
@@ -27,7 +30,8 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // Parses the body of the request into json and limit the size/space of the body
-app.use(express.json({ limit: '10kb' }));
+app.use(express.json({ limit: '40kb' }));
+app.use(express.urlencoded({ extended: true, limit: '40kb' }));
 
 // Data sanitization against NoSQL query injection
 app.use(mongoSanitize());
@@ -41,16 +45,16 @@ app.use(xss());
 app.use(
   hpp({
     whitelist: [
-      'duration',
-      'ratingsQuantity',
-      'ratingsAverage',
-      'maxGroupSize',
-      'difficulty',
-      'price',
+      'phoneNumber',
+      'state',
+      'orderType',
+      'orderContent',
+      'paymentStatus',
+      'createdAt',
     ],
   })
 );
-
+app.use(compression());
 //ROUTES
 app.use('/api/v1/orders', orderRouter);
 app.use('/api/v1/users', userRouter);

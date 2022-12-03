@@ -48,7 +48,7 @@ const userSchema = new mongoose.Schema({
   },
   userType: {
     type: String,
-    enum: ['user', 'admin', 'ceu', 'warehouse', 'logistics'],
+    enum: ['user', 'admin', 'ceu', 'warehouse', 'logistics', 'sales'],
     default: 'user',
   },
   passwordChangedAt: Date,
@@ -62,7 +62,8 @@ const userSchema = new mongoose.Schema({
 });
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-  await bcrypt.hash(this.password, 12);
+  const hash = await bcrypt.hash(this.password, 12);
+  this.password = hash;
   this.passwordConfirm = undefined;
   next();
 });
@@ -71,6 +72,7 @@ userSchema.pre('save', async function (next) {
   this.passwordChangedAt = Date.now() - 1000; // subtract 1 second to make sure the token is created before the password is changed;
   next();
 });
+
 userSchema.pre(/^find/, function (next) {
   this.find({ active: { $ne: false } });
   next();
