@@ -1,10 +1,11 @@
-const fs = require('fs');
-const Order = require('../models/orderModel.js');
-const APIFeatures = require('../utils/APIFeatures.js');
-const catchAsync = require('./../utils/catchAsync');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
+
+const Order = require('../models/orderModel');
+const APIFeatures = require('../utils/APIFeatures');
+const catchAsync = require('../utils/catchAsync');
+const AppError = require('../utils/AppError');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

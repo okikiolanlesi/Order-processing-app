@@ -7,7 +7,7 @@ const xss = require('xss-clean');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 const compression = require('compression');
-
+const cors = require('cors');
 const orderRouter = require('./routes/orderRoutes');
 const userRouter = require('./routes/userRoutes');
 const AppError = require('./utils/AppError');
@@ -18,9 +18,25 @@ const app = express();
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
+app.use(
+  cors({
+    origin: 'http://127.0.0.1:3000',
+    credentials: true,
+  })
+);
+app.options(
+  '*',
+  cors({
+    origin: 'http://127.0.0.1:3000',
+    credentials: true,
+  })
+);
+
+app.use(cookieParser());
+
 // Sets security HTTP headers
 app.use(helmet());
-app.use(cookieParser());
+
 // Limits request per IP address
 const limiter = rateLimit({
   max: 100,

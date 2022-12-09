@@ -1,31 +1,35 @@
-const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
-const catchAsync = require('../utils/catchAsync');
-const AppError = require('../utils/AppError');
-const sendEmail = require('../utils/email');
 const crypto = require('crypto');
 const { promisify } = require('util');
 
-const createSendToken = async (res, user, statusCode, req) => {
-  const { id } = user;
-  const token = await jwt.sign({ id }, process.env.JWT_SECRET, {
+const User = require('../models/userModel');
+const catchAsync = require('../utils/catchAsync');
+const AppError = require('../utils/AppError');
+const sendEmail = require('../utils/email');
+
+const signToken = (id) =>
+  jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
+const createSendToken = (res, user, statusCode, req) => {
+  const token = signToken(user._id);
   const cookieOptions = {
-    expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
-    ),
-    secure: false,
+    maxAge: process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000,
+    // httpOnly: true means that the cookie cannot be accessed or modified in any way by the browser
     httpOnly: true,
+    sameSite: 'none',
+    secure: true,
   };
-  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https')
     cookieOptions.secure = true;
-  }
 
   res.cookie('jwt', token, cookieOptions);
-  if (user.password) user.password = undefined;
-  if (user.passwordConfirm) user.passwordConfirm = undefined;
-  if (user.passwordChangedAt) user.passwordChangedAt = undefined;
+
+  // Remove password from output
+  user.password = undefined;
+  user.passwordChangedAt = undefined;
+  user.passwordResetToken = undefined;
+
   res.status(statusCode).json({
     status: 'success',
     token,
@@ -49,6 +53,7 @@ exports.login = catchAsync(async (req, res, next) => {
   if (!user) return next(new AppError('Invalid details', 401));
   const passwordCheck = await user.isCorrectPassword(password, user.password);
   if (!passwordCheck) return next(new AppError('Invalid details', 401));
+
   createSendToken(res, user, 200, req);
 });
 exports.protect = catchAsync(async (req, res, next) => {

@@ -42,6 +42,7 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
+// eslint-disable-next-line new-cap
 const Order = new mongoose.model('Order', orderSchema);
 
 module.exports = Order;
